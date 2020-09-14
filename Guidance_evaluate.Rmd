@@ -1,0 +1,45 @@
+---
+title: "guidance_evaluate"
+author: "Nicolas Fuentes Turpin"
+date: "25/8/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+prots = read.csv("knn_predicts.csv", stringsAsFactors = F, header = F)
+for (prot in prots) {
+  myname = c(">", prot$name)
+  mypath = "~/proteinas/files/"
+  myoutpath = "~/proteinas/files/outputs/"
+  allres = NULL
+  fs = list.files(mypath,full.names = T)
+  fs = fs[grep("fasta.txt$",fs)]
+  for(myfile in fs){
+    myfiledata = read.delim(myfile,stringsAsFactors=F,header = F)
+    mydf = data.frame(do.call(rbind,lapply(seq(1,as.integer(nrow(myfiledata)),2),
+                                           function(x){ c(myfiledata[x,1],myfiledata[x+1,1])})),
+                      stringsAsFactors=F)
+    mydf = rbind(mydf,c(myname,prot$str))
+    mynewdf = NULL
+    devnull = apply(mydf,1,function(x){ mynewdf <<- rbind(mynewdf,rbind(x[1],x[2])) })
+    newfastafile = paste0(myfile,"_withpred.txt")
+    write.table(mynewdf,
+                newfastafile,
+                quote=F,col.names=F,row.names=F)
+    system(paste0("rm ",myoutpath,"/*"))
+    system(paste0("perl ~/guidance.v2.02/www/Guidance/guidance.pl --seqFile ",newfastafile," -seqType aa --outDir ~/macroprot/files/outputs --msaProgram MAFFT --bootstraps 5"))
+  
+  
+    localres = read.delim(paste0(myoutpath,"/MSA.MAFFT.Guidance2_res_pair_seq.scr_with_Names"),
+             stringsAsFactors=F,comment.char = "#")
+    allres = rbind(allres,cbind(rep(basename(myfile),nrow(localres)),localres))
+}
+  colnames(allres)[1] = "Family"
+  write.csv(allres,paste0(mypath,"/ResultsFor",prot$name,".csv"))
+}
+```
+

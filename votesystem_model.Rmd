@@ -1,0 +1,157 @@
+---
+title: "Vote"
+author: "Nicolas Fuentes Turpin"
+date: "6/9/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(readxl)
+my_data <- as.data.frame(read_excel("myfile_simple.xlsx"))
+
+```
+
+```{r}
+unknown_df = my_data[my_data$tipo == "unknown",]
+known_df = my_data[my_data$tipo != "unknown",]
+```
+
+```{r}
+set.seed(2020)
+unknown_df_copy = unknown_df
+desired_length = nrow(known_df)
+dfs = list()
+i = 1
+while (nrow(unknown_df_copy) >= desired_length) {
+  indexes = sample(nrow(unknown_df_copy), desired_length)
+  df = unknown_df_copy[indexes,]
+  unknown_df_copy = unknown_df_copy[-indexes,]
+  dfs[[i]] = rbind(df, known_df)
+  i = i+1
+}
+```
+
+```{r}
+library(caret)
+set.seed(2020)
+
+lda_models = list()
+rf_models = list()
+gbm_models = list()
+
+var.salida = c("tipo")
+var.entrada = setdiff(names(unknown_df), c("tipo"))
+i = 1
+
+for (df in dfs) {
+  ind = createDataPartition(y = df$tipo, p = 0.8, times = 1, list = FALSE)
+  train.df = df[ind,]
+  test.df = df[-ind,]
+  
+  trctrl = trainControl(method = "repeatedcv",
+                                       number = 10,
+                                       repeats = 3,
+                                        verboseIter=F,
+                                        summaryFunction = multiClassSummary)
+  
+  lda_model = train(train.df[var.entrada], 
+                    train.df[[var.salida]], 
+                    method = 'lda', 
+                    trControl = trctrl)
+  
+  rf_model = train(train.df[var.entrada], 
+                    train.df[[var.salida]], 
+                    method = 'rf', 
+                    trControl = trctrl)
+  
+  gbm_model = train(train.df[var.entrada], 
+                    train.df[[var.salida]], 
+                    method = 'gbm', 
+                    trControl = trctrl)
+  
+  lda_models[[i]] = lda_model
+  rf_models[[i]] = rf_model
+  gbm_models[[i]] = gbm_model
+  
+  i = i + 1
+}
+```
+
+```{r}
+total_accuracy_lda = 0
+total_kappa_lda = 0
+max_accuracy_lda = 0
+max_kappa_lda = 0
+for (model in lda_models) {
+  accuracy = model$results$Accuracy
+  kappa = model$results$Kappa
+  total_accuracy_lda = total_accuracy_lda + accuracy
+  total_kappa_lda = total_kappa_lda + kappa
+  if (accuracy > max_accuracy_lda)
+    max_accuracy_lda = accuracy
+  if (kappa > max_kappa_lda)
+    max_kappa_lda = kappa
+}
+total_accuracy_lda = total_accuracy_lda/length(lda_models)
+total_kappa_lda = total_kappa_lda/length(lda_models)
+```
+
+```{r}
+total_accuracy_rf = 0
+total_kappa_rf = 0
+max_accuracy_rf = 0
+max_kappa_rf = 0
+for (model in rf_models) {
+  accuracy = model$results$Accuracy
+  kappa = model$results$Kappa
+  total_accuracy_rf = total_accuracy_rf + accuracy
+  total_kappa_rf = total_kappa_rf + kappa
+  if (accuracy > max_accuracy_rf)
+    max_accuracy_rf = accuracy
+  if (kappa > max_kappa_rf)
+    max_kappa_rf = kappa
+}
+total_accuracy_rf = total_accuracy_rf/length(rf_models)
+total_kappa_rf = total_kappa_rf/length(rf_models)
+```
+
+```{r}
+total_accuracy_gbm = 0
+total_kappa_gbm = 0
+max_accuracy_gbm = 0
+max_kappa_gbm = 0
+for (model in gbm_models) {
+  accuracy = model$results$Accuracy
+  kappa = model$results$Kappa
+  total_accuracy_gbm = total_accuracy_gbm + accuracy
+  total_kappa_gbm = total_kappa_gbm + kappa
+  if (accuracy > max_accuracy_gbm)
+    max_accuracy_gbm = accuracy
+  if (kappa > max_kappa_gbm)
+    max_kappa_gbm = kappa
+}
+total_accuracy_gbm = total_accuracy_gbm/length(gbm_models)
+total_kappa_gbm = total_kappa_gbm/length(gbm_models)
+```
+
+```{r}
+total_accuracy_lda
+total_kappa_lda
+total_accuracy_rf
+total_kappa_rf
+total_accuracy_gbm
+total_kappa_gbm
+```
+```{r}
+max_accuracy_lda
+max_kappa_lda
+max_accuracy_rf
+max_kappa_rf
+max_accuracy_gbm
+max_kappa_gbm
+```
+

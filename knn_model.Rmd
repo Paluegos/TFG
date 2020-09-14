@@ -1,0 +1,79 @@
+---
+title: "TFG"
+author: "Nicolás Fuentes Turpín"
+date: "18/2/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Leyendo los datos
+
+```{r}
+library(readxl)
+my_data <- as.data.frame(read_excel("myfile_simple.xlsx"))
+str(my_data)
+
+my_data_caret = my_data
+my_data_caret$tipo = NULL
+```
+
+
+```{r}
+library(ggplot2)
+pca_result = prcomp(my_data_caret, scale = TRUE)
+pcas_mydata = as.data.frame(pca_result$x, stringsAsFactors = F)
+ggplot(pcas_mydata, aes(x = PC1, y = PC2, color=my_data$tipo)) +
+  geom_point(alpha=0.6) +
+  labs(title="Unkown and Known Proteines",x="Principal Component 1", y = "Principal Component 2")
+```
+
+
+```{r}
+VE <- pca_result$sdev^2
+PVE <- VE / sum(VE)
+round(PVE, 2)
+```
+
+
+```{r}
+data = cbind(pcas_mydata$PC1, pcas_mydata$PC2)
+types = my_data$tipo
+dataframe = data.frame(data, index=types)
+dataframe
+```
+
+```{r}
+library(ISLR)
+library(caret)
+```
+
+```{r}
+set.seed(2020)
+ind = createDataPartition(y = dataframe$index, p = 0.8, times = 1, list = FALSE)
+train.df = dataframe[ind,]
+test.df = dataframe[-ind,]
+
+trctrl = trainControl(method = "repeatedcv",
+                                     number = 10,
+                                     repeats = 3,
+                                      verboseIter=F,
+                                      summaryFunction = multiClassSummary)
+
+```
+
+```{r}
+set.seed(1234)
+knn_fit <- train(index ~., data = train.df,
+                method='knn',
+                trControl=trctrl)
+knn_fit
+```
+
+```{r}
+knn_predict <- predict(knn_fit, newdata = test.df)
+confusionMatrix(knn_predict, test.df$index)
+```
+
